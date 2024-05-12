@@ -1,0 +1,98 @@
+﻿@page "/testChart"
+
+@using Blazorise.Charts
+@using Blazorise
+@inject SarServiceList SarServiceList
+<h3>Blazorize Chart from sar data</h3>
+<p><a target="_blank" href="https://blazorise.com/docs/extensions/datagrid/getting-started">https://blazorise.com/docs/extensions/datagrid/getting-started</a> </p>
+@if (sarData == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    
+<Button Color="Color.Primary" Clicked="@(async () => await HandleRedraw())">Redraw</Button>
+
+<LineChart @ref="lineChart" TItem="double" />
+}
+@code{
+    private List<SarData> sarData ;
+    LineChart<double> lineChart;
+    List<string> backgroundColors = new List<string> { ChartColor.FromRgba(255, 99, 132, 0.2f), ChartColor.FromRgba(54, 162, 235, 0.2f), ChartColor.FromRgba(255, 206, 86, 0.2f), ChartColor.FromRgba(75, 192, 192, 0.2f), ChartColor.FromRgba(153, 102, 255, 0.2f), ChartColor.FromRgba(255, 159, 64, 0.2f) };
+    List<string> borderColors = new List<string> { ChartColor.FromRgba(255, 99, 132, 1f), ChartColor.FromRgba(54, 162, 235, 1f), ChartColor.FromRgba(255, 206, 86, 1f), ChartColor.FromRgba(75, 192, 192, 1f), ChartColor.FromRgba(153, 102, 255, 1f), ChartColor.FromRgba(255, 159, 64, 1f) };
+
+
+    string[] Labels;
+    protected override async Task OnAfterRenderAsync( bool firstRender )
+    {
+        if ( firstRender )
+        {
+            await HandleRedraw();
+        }
+    }
+
+    async Task HandleRedraw()
+    {
+
+        await RefreshData();
+        await lineChart.Clear();
+        string backgroundColor = backgroundColors[1];
+        string borderColor = borderColors[1];
+        await lineChart.AddLabelsDatasetsAndUpdate(Labels, GetLineChartDataset(backgroundColors[1], borderColors[1], "System"),
+        GetLineChartDataset(backgroundColors[2], borderColors[2], "User"),
+          GetLineChartDataset(backgroundColors[3], borderColors[3], "IOWait")
+        );
+        //await lineChart
+    }
+
+    LineChartDataset<double> GetLineChartDataset(string backgroundColor, string borderColor,string label)
+    {
+        return new LineChartDataset<double>
+            {
+                Label = label,
+                Data = GetPropertyValues(sarData, label),
+                BackgroundColor = backgroundColor,
+                BorderColor = borderColor,
+                Fill = false,
+                PointRadius = 3,
+                CubicInterpolationMode = "monotone",
+        };
+    }
+
+
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        await RefreshData();
+    }
+
+    List<double> oneSeriesFromsarData()
+    {
+        //var userList = sarData.Select(data => data.User).ToList();
+        List<double> userList= GetPropertyValues(sarData, "System");
+        Console.WriteLine($"userList prepared count:{userList.Count}");
+        return userList;
+    }
+
+    private async Task RefreshData()
+    {
+        sarData = await SarServiceList.RunSarAsync();
+        Console.WriteLine($"sarData fetched count:{sarData.Count}");
+        Labels = sarData.Select(data => data.Time.ToString()).ToArray();
+
+    }
+
+    public static List<double> GetPropertyValues(IEnumerable<SarData> sarData, string propertyName)
+    {
+        var propertyInfo = typeof(SarData).GetProperty(propertyName);
+        if (propertyInfo == null || propertyInfo.PropertyType != typeof(double))
+        {
+            throw new ArgumentException("Property not found or is not of type double");
+        }
+
+        return sarData.Select(data => (double)propertyInfo.GetValue(data)).ToList();
+    }
+
+}

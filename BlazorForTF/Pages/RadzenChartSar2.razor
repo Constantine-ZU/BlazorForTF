@@ -1,0 +1,114 @@
+﻿@page "/RadzenChartSar2"
+@using Radzen
+@using Radzen.Blazor
+@inject SarServiceList SarServiceList
+@using System.Reflection
+
+<h3>Radzen Chart from sar data</h3>
+<p><a target="_blank" href="https://www.radzen.com/documentation/blazor/chart/">https://www.radzen.com/documentation/blazor/chart/</a> </p>
+@if (sarData == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <RadzenButton Click=@(args => HandleRedraw()) Text="Fetch New Data" ButtonStyle="ButtonStyle.Primary" />
+
+    <RadzenCard class="w-100 mb-4" Style="display: flex; align-items: center; gap: 0.5rem">
+        <RadzenCheckBox @bind-Value="@smooth" Name="smooth" />
+        <RadzenLabel Text="Smooth" Component="smooth" Style="margin-right: 1rem;" />
+        <RadzenCheckBox @bind-Value="@showDataLabels" Name="dataLabels" />
+        <RadzenLabel Text="Show Data Labels" Component="dataLabels" Style="margin-right: 1rem;" />
+        <RadzenCheckBox @bind-Value="@showMarkers" Name="markers" />
+        <RadzenLabel Text="Show Markers" Component="markers" />
+
+        <RadzenDropDown Data="@stepOptions" @bind-Value="@stepMinutes" Style="width: 80px;" Change="@OnStepChange" />
+        <RadzenLabel Text="Step Minutes" Style="margin-right: 10px;" />
+
+    </RadzenCard>
+
+    <RadzenChart>
+        <RadzenCategoryAxis Formatter="@FormatDateTime" Max="@maxTime" Min="@minTime" Step="@(TimeSpan.FromMinutes(stepMinutes))" />
+        @foreach (var prop in GetDoubleProperties(sarData.FirstOrDefault()))
+        {
+            <RadzenLineSeries Smooth="@smooth" Data="@GetPropertyValues(sarData, prop.Name)"
+                              CategoryProperty="Time" Title="@prop.Name" ValueProperty="Value">
+                <RadzenMarkers Visible="@showMarkers" MarkerType="MarkerType.Square" />
+                <RadzenSeriesDataLabels Visible="@showDataLabels" />
+            </RadzenLineSeries>
+        }
+    </RadzenChart>
+}
+
+@code {
+    private List<SarData> sarData;
+    bool smooth = false;
+    bool showDataLabels = false;
+    bool showMarkers = false;
+    private DateTime minTime;
+    private DateTime maxTime;
+    int stepMinutes = 20;
+    List<int> stepOptions = new List<int> { 10, 20, 30, 60 };
+    
+    private void OnStepChange(object value)
+    {
+        if (value is int intValue)
+        {
+            stepMinutes = intValue;
+            StateHasChanged(); // Update the UI to reflect the change
+        }
+    }
+
+    
+    // Initialize and fetch data
+    protected override async Task OnInitializedAsync()
+    {
+        await RefreshData();
+    }
+
+    // Handle UI redraw
+    private async Task HandleRedraw()
+    {
+        await RefreshData();
+        StateHasChanged(); // Triggers UI refresh
+    }
+
+    // Refresh or fetch new data
+    private async Task RefreshData()
+    {
+        sarData = await SarServiceList.RunSarAsync();
+        if (sarData.Any())
+        {
+            minTime = sarData.Min(s => s.Time);
+            maxTime = sarData.Max(s => s.Time);
+        }
+        Console.WriteLine($"sarData fetched count: {sarData.Count}");
+    }
+
+    // Extract properties of type double from SarData class
+    private IEnumerable<PropertyInfo> GetDoubleProperties(SarData example)
+    {
+        return example?.GetType().GetProperties().Where(prop => prop.PropertyType == typeof(double));
+    }
+
+    // Generate data items from SarData based on a property name
+    public DataItem[] GetPropertyValues(List<SarData> sarData, string propertyName)
+    {
+        var propertyInfo = typeof(SarData).GetProperty(propertyName);
+        if (propertyInfo == null || propertyInfo.PropertyType != typeof(double))
+        {
+            throw new ArgumentException($"Property {propertyName} not found or is not of type double");
+        }
+        return sarData.Select(data => new DataItem
+            {
+                Time = data.Time,
+                Value = (double)propertyInfo.GetValue(data)
+            }).ToArray();
+    }
+
+    // Format datetime for the chart axis
+    private string FormatDateTime(object datetime)
+    {
+        return datetime is DateTime time ? time.ToString("HH:mm") : "";
+    }
+}

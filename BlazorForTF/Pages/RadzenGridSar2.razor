@@ -1,0 +1,82 @@
+﻿@page "/RadzenGridSar2"
+@using Radzen
+@using Radzen.Blazor
+@inject SarServiceList SarServiceList
+@using System.Reflection
+<h3>Radzen Grid from sar data</h3>
+<p><a target="_blank" href="https://blazor.radzen.com/datagrid-dynamic">https://blazor.radzen.com/datagrid-dynamic</a> </p>
+
+
+@if (sarData == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <RadzenButton Click=@(args => HandleRedraw()) Text="Fetch New Data" ButtonStyle="ButtonStyle.Primary" />
+ 
+    <RadzenDropDown Data="@pageSizes" @bind-Value="@pageSize" Style="width: 80px;" Change="@OnPageSizeChange" />
+    <RadzenLabel Text="Records per page" Style="margin-right: 10px;" />
+
+    <RadzenDataGrid Data="@convertedData" TItem="IDictionary<string, object>" PageSize="@pageSize" AllowPaging="true" AllowFiltering="true" AllowSorting="true">
+        <Columns>
+            @foreach (var key in convertedData.FirstOrDefault()?.Keys ?? new List<string>())
+            {
+                <RadzenDataGridColumn Title="@key" Property="@($"it[\"{key}\"]")">
+                    <Template Context="data">
+                        @(data[key]?.ToString())
+                    </Template>
+                </RadzenDataGridColumn>
+            }
+        </Columns>
+    </RadzenDataGrid>
+
+}
+
+@code {
+    private List<SarData> sarData;
+    private IEnumerable<IDictionary<string, object>> convertedData;
+    List<int> pageSizes = new List<int> { 10, 20, 40, 100 };
+    private int pageSize = 20; // Default page size
+    
+    private void OnPageSizeChange(Object value)
+    {
+        if (value is int intValue)
+        {
+            pageSize = intValue;
+            StateHasChanged(); // Ensure the grid updates to reflect the new page size
+        }
+    }
+
+    // Initialize and fetch data
+    protected override async Task OnInitializedAsync()
+    {
+        await RefreshData();
+    }
+
+    // Handle UI redraw
+    private async Task HandleRedraw()
+    {
+        await RefreshData();
+        StateHasChanged(); // Triggers UI refresh
+    }
+    public IEnumerable<IDictionary<string, object>> ConvertSarDataToDictionary(List<SarData> sarData)
+    {
+        return sarData.Select(s => s.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance)
+                                   .ToDictionary(prop => prop.Name, prop => prop.GetValue(s)));
+    }
+
+    // Refresh or fetch new data
+    private async Task RefreshData()
+    {
+        sarData = await SarServiceList.RunSarAsync();
+        convertedData = ConvertSarDataToDictionary(sarData);
+        Console.WriteLine($"sarData fetched count: {sarData.Count}");
+    }
+
+    // Extract properties of type double from SarData class
+    private IEnumerable<PropertyInfo> GetDoubleProperties(SarData example)
+    {
+        return example?.GetType().GetProperties().Where(prop => prop.PropertyType == typeof(double));
+    }
+}

@@ -1,0 +1,81 @@
+﻿@page "/sarmonitor"
+@inject SarService SarService
+@inject SarCommandValidator SarCommandValidator
+
+<h3>Live monitor sar data</h3>  
+
+<input type="text" @bind="sarCommand" class="@commandInputClass" @oninput="ValidateCommand" />
+
+<button @onclick="StartFetching" disabled="@isFetching">Start Fetching</button>
+<button @onclick="StopFetching" disabled="@(!isFetching)">Stop Fetching</button>
+
+@if (sarData.Any())
+{
+    <pre>@string.Join("\n", sarData)</pre>
+}
+
+@code {
+    private List<string> sarData = new();
+    private string sarCommand = "sar -u 2 10"; // Default value for command
+    private bool isFetching = false;
+    private string commandInputClass = ""; // To control the input field styling based on command validation
+    private CancellationTokenSource? cancellationTokenSource;
+
+    // Initializes fetching process
+
+    private async Task StartFetching()
+    {
+        if (isFetching) return;
+        
+        isFetching = true;
+        cancellationTokenSource = new CancellationTokenSource();
+        await InvokeAsync(StateHasChanged);
+
+        try
+        {
+            await SarService.RunSar(
+                sarCommand,
+                line =>
+                {
+                    sarData.Add(line);
+                    InvokeAsync(StateHasChanged);
+                },
+                error =>
+                {
+                    sarData.Add($"Error: {error}");
+                    InvokeAsync(StateHasChanged);
+                },
+                cancellationTokenSource.Token
+            );
+        }
+        catch (OperationCanceledException)
+        {
+            sarData.Add("Fetching canceled.");
+            InvokeAsync(StateHasChanged);
+        }
+        finally
+        {
+            isFetching = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    // Stops the fetching process
+    private void StopFetching()
+    {
+        if (cancellationTokenSource != null && isFetching)
+        {
+
+            cancellationTokenSource.Cancel(); // Send cancellation request
+            //cancellationTokenSource.Dispose();
+            //cancellationTokenSource = null;
+        }
+    }
+
+    // Validates the command and adjusts input styling
+    private void ValidateCommand(ChangeEventArgs e)
+    {
+        sarCommand = e.Value?.ToString() ?? string.Empty;
+        commandInputClass = SarCommandValidator.Validate(sarCommand) ? "ok-command" : "invalid-command";
+    }
+}

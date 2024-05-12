@@ -1,0 +1,127 @@
+﻿@page "/RadzenChartSar"
+@using Radzen
+@using Radzen.Blazor
+@inject SarServiceList SarServiceList
+
+@if (sarData == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+   
+    <RadzenButton Click=@(args => HandleRedraw()) Text="Fetch New Data" ButtonStyle="ButtonStyle.Primary" />
+
+    <RadzenCard class="w-100 mb-4" Style="display: flex; align-items: center; gap: 0.5rem">
+        <RadzenCheckBox @bind-Value="@smooth" Name="smooth"></RadzenCheckBox>
+        <RadzenLabel Text="Smooth" Component="smooth" Style="margin-right: 1rem;" />
+        <RadzenCheckBox @bind-Value="@showDataLabels" Name="dataLabels"></RadzenCheckBox>
+        <RadzenLabel Text="Show Data Labels" Component="dataLabels" Style="margin-right: 1rem;" />
+        <RadzenCheckBox @bind-Value="@showMarkers" Name="markers"></RadzenCheckBox>
+        <RadzenLabel Text="Show Markers" Component="markers" />
+        <!-- Slider for adjusting the step size of the category axis -->
+        <RadzenSlider Min="10" Max="60" Step="10" @bind-Value="stepMinutes"
+                      Style="flex-grow: 1; margin-left: 20px;" Change="@((int value) => OnStepChange(value))" />
+
+    </RadzenCard>
+
+    <RadzenChart>
+
+
+        <RadzenCategoryAxis Formatter="@FormatDateTime" Max="@maxTime" Min="@minTime" Step="@(TimeSpan.FromMinutes(stepMinutes))" />
+        <RadzenLineSeries Smooth="@smooth" Data="@GetPropertyValues(sarData, "User")" CategoryProperty="Time" Title="User"  ValueProperty="Value">
+            <RadzenMarkers Visible="@showMarkers" MarkerType="MarkerType.Square" />
+            <RadzenSeriesDataLabels Visible="@showDataLabels" />
+        </RadzenLineSeries>
+        <RadzenLineSeries Smooth="@smooth" Data="@GetPropertyValues(sarData, "Nice")" CategoryProperty="Time" Title="Nice"  ValueProperty="Value">
+            <RadzenMarkers Visible="@showMarkers" MarkerType="MarkerType.Square" />
+            <RadzenSeriesDataLabels Visible="@showDataLabels" />
+        </RadzenLineSeries>
+        <RadzenLineSeries Smooth="@smooth" Data="@GetPropertyValues(sarData, "System")" CategoryProperty="Time" Title="System"  ValueProperty="Value">
+            <RadzenMarkers Visible="@showMarkers" MarkerType="MarkerType.Square" />
+            <RadzenSeriesDataLabels Visible="@showDataLabels" />
+        </RadzenLineSeries>
+
+        <RadzenLineSeries Smooth="@smooth" Data="@GetPropertyValues(sarData, "IOWait")" CategoryProperty="Time" Title="IOWait" ValueProperty="Value">
+            <RadzenMarkers Visible="@showMarkers" MarkerType="MarkerType.Square" />
+            <RadzenSeriesDataLabels Visible="@showDataLabels" />
+        </RadzenLineSeries>
+        <RadzenLineSeries Smooth="@smooth" Data="@GetPropertyValues(sarData, "Steal")" CategoryProperty="Time" Title="Steal"  ValueProperty="Value">
+            <RadzenMarkers Visible="@showMarkers" MarkerType="MarkerType.Square" />
+            <RadzenSeriesDataLabels Visible="@showDataLabels" />
+        </RadzenLineSeries>
+        <RadzenLineSeries Smooth="@smooth" Data="@GetPropertyValues(sarData, "Idle")" CategoryProperty="Time" Title="Idle"  ValueProperty="Value">
+            <RadzenMarkers Visible="@showMarkers" MarkerType="MarkerType.Square" />
+            <RadzenSeriesDataLabels Visible="@showDataLabels" />
+        </RadzenLineSeries>
+
+
+
+    </RadzenChart>
+}
+
+@code{
+    private List<SarData> sarData;
+    bool smooth = false;
+    bool showDataLabels = false;
+    bool showMarkers = true;
+    int stepMinutes = 30;
+    private DateTime minTime;
+    private DateTime maxTime;
+
+    private void OnStepChange(int value)
+    {
+        stepMinutes = value;
+        StateHasChanged(); // Re-render the component to update the chart
+    }
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        await RefreshData();
+    }
+
+    private async Task HandleRedraw()
+    {
+        await RefreshData();
+        StateHasChanged(); // This triggers a UI refresh
+    }
+
+    private async Task RefreshData()
+    {
+        sarData = await SarServiceList.RunSarAsync();
+        minTime = sarData.Min(sarData => sarData.Time);
+        maxTime = sarData.Max(sarData => sarData.Time);
+        Console.WriteLine($"sarData fetched count: {sarData.Count}");
+        // Add a line to log the first item's Time property to debug
+        if (sarData.Any())
+            Console.WriteLine($"First item's Time: {sarData.First().Time}");
+    }
+
+
+    public DataItem[] GetPropertyValues(List<SarData> sarData, string propertyName)
+    {
+        var propertyInfo = typeof(SarData).GetProperty(propertyName);
+        if (propertyInfo == null || propertyInfo.PropertyType != typeof(double))
+        {
+            throw new ArgumentException($"Property {propertyName} not found or is not of type double");
+        }
+        var res = sarData.Select(data => new DataItem
+            {
+                Time = data.Time,
+               // Time = DateTime.Parse(data.Time),
+                Value = (double)propertyInfo.GetValue(data)
+            }).ToArray();
+        return res;
+    }
+
+    
+    private string FormatDateTime(object datetime)
+    {
+        if (datetime is DateTime time)
+        {
+            return time.ToString("HH:mm");
+        }
+        return ""; // or some default value
+    }
+}

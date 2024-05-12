@@ -1,0 +1,51 @@
+﻿@page "/sarlist"
+@using Blazorise.Charts
+@using Blazorise
+@using Blazorise.DataGrid
+@inject SarServiceList SarServiceList
+
+<h3>Blazorize Chart from sar data Evalution license 10 records</h3>
+<p><a target="_blank" href="https://blazorise.com/docs/extensions/chart">https://blazorise.com/docs/extensions/chart</a> </p>
+
+<Button Color="Color.Primary" Clicked="RefreshData">Refresh</Button>
+<Switch TValue="bool" Checked="@showGraph" CheckedChanged="@((bool value) => showGraph = value)">Graph / Table</Switch>
+
+@if (!showGraph)
+{
+    <DataGrid TItem="SarData" Data="@sarData" ShowPager="false">
+        <DataGridColumn TItem="SarData" Field="@nameof(SarData.Time)" Caption="Time" />
+        <DataGridColumn TItem="SarData" Field="@nameof(SarData.CPU)" Caption="CPU" />
+        <DataGridColumn TItem="SarData" Field="@nameof(SarData.User)" Caption="% User" />
+        <DataGridColumn TItem="SarData" Field="@nameof(SarData.Nice)" Caption="% Nice" />
+        <DataGridColumn TItem="SarData" Field="@nameof(SarData.System)" Caption="% System" />
+        <DataGridColumn TItem="SarData" Field="@nameof(SarData.IOWait)" Caption="% IOWait" />
+        <DataGridColumn TItem="SarData" Field="@nameof(SarData.Steal)" Caption="% Steal" />
+        <DataGridColumn TItem="SarData" Field="@nameof(SarData.Idle)" Caption="% Idle" />
+    </DataGrid>
+}
+else
+{
+   // <LineChart Data="chartData" Options="chartOptions" />
+}
+
+@code {
+    private List<SarData> sarData = new();
+    private bool showGraph = false;
+    private ChartData<double> chartData;
+    private ChartOptions chartOptions;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await RefreshData();
+    }
+
+    private async Task RefreshData()
+    {
+        sarData = await SarServiceList.RunSarAsync();
+        if (showGraph)
+        {
+          //  InitializeChart();
+        }
+    }
+
+}
